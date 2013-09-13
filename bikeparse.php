@@ -1,8 +1,19 @@
 <?php
-require_once ('phpQuery/phpQuery.php');
+define('DRUPAL_ROOT', getcwd().'/..');
 
-$max_iter = 100;
-$iter = 0;
+if ( !isset( $_SERVER['REMOTE_ADDR'] ) ) {
+  $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+}
+
+require_once DRUPAL_ROOT . '/includes/bootstrap.inc';
+require_once 'phpQuery/phpQuery.php';
+
+drupal_bootstrap(DRUPAL_BOOTSTRAP_FULL);
+
+
+
+$max_iter = 1;
+$iter = 1;
 
 $files = scandir('.');
 
@@ -24,7 +35,7 @@ foreach ($files as $file) {
 	$price = str_replace('.00', '', $price);
 	$price = str_replace(',', '', $price);
 	$price = floatval($price);
-	$bike['field_price'] = $price;
+	$bike['field_moto_price'] = $price;
 	$i = 0;
 	foreach ($details->find('div.table-grid span') as $val){
 		if ($i % 2 == 0) {
@@ -44,19 +55,19 @@ foreach ($files as $file) {
 		$i++;
 	}
   if (isset($tbike['Make']))			{$bike['make'] = $tbike['Make'];}
-  if (isset($tbike['Model']))			{$bike['field_model'] = $tbike['Model'];}
-  if (isset($tbike['Production Year'])) {$bike['field_productyear'] = $tbike['Production Year'];}
-  if (isset($tbike['Engine Type'])) 	{$bike['field_strokes'] = $tbike['Engine Type'];}
-  if (isset($tbike['Bore (millimeters)'])) 	{$bike['field_bore'] = $tbike['Bore (millimeters)'];}
-  if (isset($tbike['Fuel Capacity (litres)'])) 	{$bike['field_fueltank'] = $tbike['Fuel Capacity (litres)'];}
-  if (isset($tbike['Stroke (millimeters)'])) 	{$bike['field_stroke'] = $tbike['Stroke (millimeters)'];}
-  if (isset($tbike['Seat Height (millimeters)'])) 	{$bike['field_seat'] = $tbike['Seat Height (millimeters)'];}
-  if (isset($tbike['Wheelbase (millimeters)'])) 	{$bike['field_wheelbase'] = $tbike['Wheelbase (millimeters)'];}
-  if (isset($tbike['Wet Weight (kilograms)'])) 	{$bike['field_wetweight'] = $tbike['Wet Weight (kilograms)'];}
-  if (isset($tbike['Weight (pounds)'])) 	{$bike['field_weight'] = intval($tbike['Weight (pounds)'] * 0.4536);}
+  if (isset($tbike['Model']))			{$bike['field_moto_model'] = $tbike['Model'];}
+  if (isset($tbike['Production Year'])) {$bike['field_moto_productyear'] = $tbike['Production Year'];}
+  if (isset($tbike['Engine Type'])) 	{$bike['field_moto_trokes'] = $tbike['Engine Type'];}
+  if (isset($tbike['Bore (millimeters)'])) 	{$bike['field_moto_bore'] = $tbike['Bore (millimeters)'];}
+  if (isset($tbike['Fuel Capacity (litres)'])) 	{$bike['field_moto_fueltank'] = $tbike['Fuel Capacity (litres)'];}
+  if (isset($tbike['Stroke (millimeters)'])) 	{$bike['field_moto_stroke'] = $tbike['Stroke (millimeters)'];}
+  if (isset($tbike['Seat Height (millimeters)'])) 	{$bike['field_moto_seat'] = $tbike['Seat Height (millimeters)'];}
+  if (isset($tbike['Wheelbase (millimeters)'])) 	{$bike['field_moto_wheelbase'] = $tbike['Wheelbase (millimeters)'];}
+  if (isset($tbike['Wet Weight (kilograms)'])) 	{$bike['field_moto_wetweight'] = $tbike['Wet Weight (kilograms)'];}
+  if (isset($tbike['Weight (pounds)'])) 	{$bike['field_moto_weight'] = intval($tbike['Weight (pounds)'] * 0.4536);}
   
-  if (isset($bike['field_bore']) and isset($bike['field_stroke'])) {
-  	$bike['field_volume'] = intval(pi() * $bike['field_bore'] * $bike['field_bore'] * $bike['field_stroke'] / 4000);
+  if (isset($bike['field_moto_bore']) and isset($bike['field_moto_stroke'])) {
+  	$bike['field_moto_volume'] = intval(pi() * $bike['field_moto_bore'] * $bike['field_moto_bore'] * $bike['field_moto_stroke'] / 4000);
   }
 
   //print_r ($tbike);
@@ -65,7 +76,46 @@ foreach ($files as $file) {
   	print $bike['title']."Weight not set! \n";
   	print_r($tbike);
   }
-  if ($iter++ > $max_iter) break;
+
+  // --- Create node ------------
+
+      $node = new stdClass(); // Create a new node object
+      $node->type = "motorcycle"; // Or page, or whatever content type you like
+      node_object_prepare($node); // Set some default values
+        
+      $node->title    = $bike['title'];
+      $node->language = LANGUAGE_NONE; // Or e.g. 'en' if locale is enabled
+      
+      $node->uid = 1; // UID of the author of the node; or use $node->name
+      
+//      $node->body[$node->language][0]['value']   = $translated;
+
+      $src = $bike['image'];
+      $filename = pathinfo($src, PATHINFO_BASENAME);
+      $img_dir = drupal_realpath(DRUPAL_ROOT."/sites/default/files/bikes/");
+      $dst = drupal_realpath($img_dir.$filename);
+      copy($src, $dst);
+      
+      
+      foreach($bike as $k => $v){
+        if (strpos($k, 'field') === 0){
+          $node->{$k}[$node->language][0]['value'] = $v;
+        }
+      }
+
+      $node->body[$node->language][0]['value'] = '<img src="/sites/default/files/bikes/'.$filename.'" alt="'.$title.'" />';
+      $node->body[$node->language][0]['summary'] = '<img src="/sites/default/files/bikes/'.$filename.'" alt="'.$title.'" />';
+      $node->body[$node->language][0]['format'] = 'full_html';
+
+      if($node = node_submit($node)) { // Prepare node for saving
+          node_save($node);
+          echo "  Node with nid " . $node->nid . " saved!\n";
+//          sleep(5);
+      }
+
+
+  // ----------------------------
+  if ($iter++ >= $max_iter) break;
   }
 }
 //print_r($bike);
